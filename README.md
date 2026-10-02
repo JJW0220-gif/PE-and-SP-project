@@ -1,3 +1,89 @@
+# Investigating Support Device-Induced Shortcut Learning in Pleural Effusion Detection
+
+This repository contains code for studying whether support devices in chest X-rays influence deep-learning predictions of pleural effusion, and whether fine-tuning with device-removed images can reduce that influence. The experiments use the DenseNet-121 `densenet121-res224-all` model from [TorchXRayVision](https://github.com/mlmed/torchxrayvision).
+
+## Study overview
+
+The study examines model scores across support-device conditions, visualizes Grad-CAM heatmaps, compares original images with counterfactual device-removed images, and evaluates fine-tuning strategies. The CheXpert images and annotations are not provided here; obtain the dataset from its official source and follow its access and use terms.
+
+Reported results on Dataset B:
+
+| Test condition | Images | AUROC | Sensitivity | Specificity |
+| --- | ---: | ---: | ---: | ---: |
+| With support devices | 500 | 0.933 | 0.916 | 0.828 |
+| Without support devices | 496 | 0.963 | 0.734 | 0.968 |
+
+For a counterfactual validation set, device-removed images achieved an AUROC of 0.87904. In fine-tuning experiments, the device-removed setting increased specificity by up to 10 percentage points at the evaluated epochs while retaining similar sensitivity. These are results from the study's selected datasets and protocol; they are not clinical validation, calibrated probabilities, or proof that devices cause model errors. Image-generation artifacts and dataset composition may also affect the results.
+
+## Repository guide
+
+| Path | Purpose |
+| --- | --- |
+| `finetune_effusion.py` | Fine-tune a single-output model for Pleural Effusion. |
+| `finetune_multilabel.py` | Shared multi-label fine-tuning implementation. |
+| `inference_effusion.py` | Batch inference and evaluation for Pleural Effusion. |
+| `heatmap_effusion.py` | Generate Grad-CAM heatmaps for the Pleural Effusion output. |
+| `docs/finetune_effusion.md` | Detailed fine-tuning options, data requirements, and outputs. |
+| `docs/effusion_inference.md` | Inference inputs, outputs, matching rules, and score interpretation. |
+
+## Setup
+
+Use Python with the dependencies in `requirements.txt`:
+
+```bash
+python -m pip install -r requirements.txt
+```
+
+Run commands from the repository root. The first run using pretrained weights may download model weights. CUDA is used when available; CPU can also be selected.
+
+## Prepare data
+
+Keep image files in the input directory and provide a CSV with a `Path` (or `path`) column. For fine-tuning, the CSV must also contain a `Pleural Effusion` column with `1` for positive, `0` for negative, and blank or `-1` for unknown. Supply `patient_id` when a patient identifier cannot be read from `Path`. Supported raster formats are JPG, JPEG, PNG, and BMP; DICOM and 16-bit images are not supported by these scripts.
+
+Check a training dataset before starting:
+
+```bash
+python finetune_effusion.py --input-dir fine00 --check-data
+```
+
+The raw CheXpert dataset must be obtained separately. Device removal in the study was performed as an image-generation step and manually reviewed; it is not performed by the training or inference scripts. Do not commit restricted dataset images or identifiable patient information.
+
+## Run experiments
+
+Fine-tune a Pleural Effusion model:
+
+```bash
+python finetune_effusion.py --input-dir fine00 --output-dir runs/fine_effusion
+```
+
+Run inference with the best checkpoint:
+
+```bash
+python inference_effusion.py --checkpoint runs/fine_effusion/best.pt --input-dir test3 --csv test3/test3.csv --output-dir test3/effusion_results
+```
+
+Generate heatmaps for images in an input directory:
+
+```bash
+python heatmap_effusion.py --input-dir test1 --checkpoint runs/fine_effusion/best.pt
+```
+
+See the linked documentation for split behavior, additional options, checkpoint handling, and output files. Inference scores are raw sigmoid scores, not calibrated disease probabilities or diagnoses. Evaluation metrics are only meaningful when the input CSV contains valid ground-truth labels.
+
+## Tests
+
+Run the focused tests from the repository root:
+
+```bash
+python -m unittest discover -s tests -p test_finetune_effusion.py
+python -m unittest discover -s tests -p test_finetune_multilabel.py
+python -m unittest discover -s tests -p test_inference_effusion.py
+```
+
+## Upstream TorchXRayVision documentation
+
+The following section is retained from the upstream TorchXRayVision project. It documents the general library and is separate from the experiments described above.
+
 🚨 Paper now online! [https://arxiv.org/abs/2111.00595](https://arxiv.org/abs/2111.00595)
 
 🚨 Documentation now online! [https://mlmed.org/torchxrayvision/](https://mlmed.org/torchxrayvision/)
